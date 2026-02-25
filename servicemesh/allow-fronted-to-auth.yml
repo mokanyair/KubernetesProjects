@@ -1,0 +1,50 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-auth
+  namespace: backend
+spec:
+  podSelector:
+    matchLabels:
+      app: auth
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: frontend
+      podSelector:
+        matchLabels:
+          app: frontend
+---
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-auth-to-orders
+  namespace: backend
+spec:
+  podSelector:
+    matchLabels:
+      app: orders
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: auth
+---
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-orders-to-payments
+  namespace: backend
+spec:
+  podSelector:
+    matchLabels:
+      app: payments
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: orders
