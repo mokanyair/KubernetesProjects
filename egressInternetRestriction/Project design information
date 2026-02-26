@@ -1,0 +1,27 @@
+####Architecture#####
+Namespace: internal
+   ↓
+Deployment (nginx)
+   ↓
+ClusterIP Service
+   ↓
+Ingress (gce)
+   ↓
+Google HTTPS Load Balancer (auto-created)
+   ↓↓↓↓ 
+Deployed Network Policy:
+Default deny all
+Allow DNS
+Allow specific external IP only
+
+
+
+kubectl apply -f namespace.yml
+kubectl apply -f deployment.yml
+kubectl apply -f denyall.yml
+kubectl apply -f allow-specific-egress.yml
+kubectl apply -f ingress.yml
+kubectl get ingress -n internal
+
+Test:
+curl -k -H "Host: app.example.com" https://34.149.113.83
