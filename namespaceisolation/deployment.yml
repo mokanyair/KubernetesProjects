@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-dev
+  namespace: dev  
+  labels:
+    app: nginx-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-dev
+  template:
+    metadata:
+      labels:
+        app: nginx-dev
+    spec:
+      containers:
+      - name: nginx-dev
+        image: nginx
+        ports:
+        - containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-staging
+  namespace: staging  
+  labels:
+    app: nginx-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-staging
+  template:
+    metadata:
+      labels:
+        app: nginx-staging
+    spec:
+      containers:
+      - name: nginx-staging
+        image: nginx
+        ports:
+        - containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-prod
+  namespace: prod  
+  labels:
+    app: nginx-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-prod
+  template:
+    metadata:
+      labels:
+        app: nginx-prod
+    spec:
+      containers:
+      - name: nginx-prod
+        image: nginx
+        ports:
+        - containerPort: 80
