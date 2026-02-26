@@ -1,0 +1,20 @@
+Install the following:
+Step 1 — Enable the NetworkPolicy Addon
+gcloud container clusters update cluster-1 \
+  --zone us-central1 \
+  --update-addons=NetworkPolicy=ENABLED
+
+Step 2 — Enable NetworkPolicy Enforcement on Nodes
+gcloud container clusters update cluster-1 \
+  --zone us-central1 \
+  --enable-network-policy
+
+Step 3 - Enable HttpLoadBalancing
+gcloud container clusters update cluster-1 \
+  --zone us-central1 \
+  --update-addons=HttpLoadBalancing=ENABLED
+
+Verify:
+gcloud container clusters describe cluster-1 \
+  --zone us-central1 \
+  --format="value(networkPolicy.enabled)"
