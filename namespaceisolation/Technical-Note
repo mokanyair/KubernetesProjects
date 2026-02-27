@@ -1,0 +1,42 @@
+Technical Note:
+Backend health status errors:
+######
+"prod-service-80-…": UNHEALTHY
+"default-http-backend-80-…": HEALTHY
+######
+
+Root cause:
+The LB cannot route to your prod-service because the backend is marked
+GCE LB will return 502 if all backends for a host/path are unhealthy.
+
+The Main Culprit
+The deny all rule in prod.
+This blocks all ingress traffic, including traffic from the GCP LB health check probes.
+
+How to Fix
+You need to allow ingress from the LB health check in your NetworkPolicy.
+Find the LB health check IPs (GKE default)
+GCP LB health checks come from 130.211.0.0/22 and 35.191.0.0/16 ranges.
+
+Add a NetworkPolicy to allow LB health checks
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-lb-healthcheck
+  namespace: prod
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx-prod
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 130.211.0.0/22
+    - ipBlock:
+        cidr: 35.191.0.0/16
+
+Wait for backend health to become HEALTHY
+# kubectl describe ingress prod-ingress -n prod
