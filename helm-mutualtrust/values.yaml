@@ -1,0 +1,29 @@
+namespaces:
+  payments:
+    name: payments
+  ledger:
+    name: ledger
+
+replicaCount: 1
+
+image:
+  repository: nginx
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+
+labels:
+  role: trusted
+
+ingress:
+  enabled: true
+  className: gce
+  host: app.deeptechexpertconsulting.com
+  tlsSecret: tls-api-secret
+
+tls:
+  secretName: tls-api-secret
+  crt: ""
+  key: ""

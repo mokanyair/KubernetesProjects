@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ledger
+  namespace: payments
+spec:
+  podSelector:
+    matchLabels:
+      role: trusted
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          trust: mutual
+      podSelector:
+        matchLabels:
+          role: trusted
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          trust: mutual
+      podSelector:
+        matchLabels:
+          role: trusted

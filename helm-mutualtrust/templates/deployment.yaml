@@ -1,0 +1,25 @@
+{{- range $key, $ns := .Values.namespaces }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $ns.name }}-app
+  namespace: {{ $ns.name }}
+spec:
+  replicas: {{ $.Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $ns.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $ns.name }}
+        role: {{ $.Values.labels.role }}
+    spec:
+      containers:
+      - name: nginx
+        image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+        imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ $.Values.service.port }}
+---
+{{- end }}

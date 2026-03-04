@@ -1,0 +1,44 @@
+{{- range $key, $ns := .Values.namespaces }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ $ns.name }}
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+{{- end }}
+{{- range $key, $ns := .Values.namespaces }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mutual-trust
+  namespace: {{ $ns.name }}
+spec:
+  podSelector:
+    matchLabels:
+      role: {{ $.Values.labels.role }}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          trust: mutual
+      podSelector:
+        matchLabels:
+          role: {{ $.Values.labels.role }}
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          trust: mutual
+      podSelector:
+        matchLabels:
+          role: {{ $.Values.labels.role }}
+---
+{{- end }}

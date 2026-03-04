@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mutual-trust
+description: Mutual Namespace Trust with TLS Ingress
+type: application
+version: 0.1.0
+appVersion: "1.0"

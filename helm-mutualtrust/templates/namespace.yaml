@@ -1,0 +1,9 @@
+{{- range $key, $ns := .Values.namespaces }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns.name }}
+  labels:
+    trust: mutual
+---
+{{- end }}
