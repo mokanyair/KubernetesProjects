@@ -1,0 +1,13 @@
+Key takeaways:
+
+#### Default PostgreSQL path alone gives directory not empty
+mount: /var/lib/postgresql/data
+
+####Solution ---> PGDATA tells PostgreSQL where the database files should live
+PGDATA: /var/lib/postgresql/data/pgdata
+
+Debugging:
+kubectl run netshoot --rm -it \
+--image=nicolaka/netshoot \
+-- bash
+nc -zv mysqldb.database.svc.cluster.local 5432
