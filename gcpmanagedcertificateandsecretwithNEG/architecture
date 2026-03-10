@@ -1,0 +1,37 @@
+  Container native load balancing architecture  
+  ===========================================
+
+Internet
+   │
+
+Google Global HTTPS Load Balancer
+
+   │
+   
+Certificate Manager (TLS termination)
+
+   │
+
+Ingress Controller
+   │
+   
+  NEG
+
+   │
+
+NGINX Pods
+
+   │
+
+PostgreSQL StatefulSet
+
+   │
+   
+Secret Manager via CSI
+
+###Benefits
+1. direct pod routing
+2. faster
+3. auto scaling
+4. better health checks
+5. lower latency

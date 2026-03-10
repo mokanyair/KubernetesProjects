@@ -1,0 +1,261 @@
+#####Implementation Notes#######
+-------->Modern design GooglecloudCertfifcate and Secret Manager, plus ingress to NEG and private ClusterIP-----------
+Internet
+  |
+ Load Balancer(Google Cloud HTTP(S) Load Balancer.)
+  |
+ Ingress Controller
+  |
+ NEG (list of pod IPs)
+  |
+ Pods directly
+
+###Create Namespace
+kubectl create namespace database
+kubectl create namespace web
+
+###Create Secret in Secret Manager
+gcloud secrets create postgres-password \
+--replication-policy="automatic"
+
+###Add password:
+echo -n "MyDBPassword123" | \
+gcloud secrets versions add postgres-password --data-file=-
+
+###Verify
+gcloud secrets versions access latest --secret=postgres-password
+
+###Install Secrets Store CSI Driver
+kubectl apply -f https://github.com/kubernetes-sigs/secrets-store-csi-driver/releases/latest/download/secrets-store-csi-driver.yaml
+###Install GCP provider plugin
+kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/secrets-store-csi-driver-provider-gcp/main/deploy/provider-gcp-plugin.yaml
+
+### If the above CSI Driver installation fails, 
+# 1Add Helm repo
+helm repo add secrets-store-csi-driver https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
+
+# 2️Update repos
+helm repo update
+
+# 3️Install driver with CRDs
+helm upgrade --install csi-secrets-store secrets-store-csi-driver/secrets-store-csi-driver \
+  --namespace kube-system \
+  --create-namespace \
+  --set syncSecret.enabled=true \
+  --set linux.crds.enabled=true \
+  --set enableSecretRotation=true \
+  --set rotationPollInterval=2m
+###Install GCP provider plugin
+kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/secrets-store-csi-driver-provider-gcp/main/deploy/provider-gcp-plugin.yaml
+
+### kubectl get pods -n kube-system | grep secrets
+
+###Create Service Account for Pod
+--> Create GCP service account
+gcloud iam service-accounts create postgres-secret-sa
+--> Grant secret access
+gcloud projects add-iam-policy-binding gke-new-2026 \
+--member="serviceAccount:postgres-secret-sa@gke-new-2026.iam.gserviceaccount.com" \
+--role="roles/secretmanager.secretAccessor"
+
+### Create Kubernetes Service Account
+kubectl create serviceaccount postgres-sa -n database
+
+--> Bind identity
+gcloud iam service-accounts add-iam-policy-binding \
+postgres-secret-sa@gke-new-2026.iam.gserviceaccount.com \
+--role roles/iam.workloadIdentityUser \
+--member "serviceAccount:gke-new-2026.svc.id.goog[database/postgres-sa]"
+
+--> Annotate
+kubectl annotate serviceaccount postgres-sa \
+iam.gke.io/gcp-service-account=postgres-secret-sa@gke-new-2026.iam.gserviceaccount.com \
+-n database
+
+###Create SecretProviderClass
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: postgres-secret
+  namespace: database
+spec:
+  provider: gcp
+  parameters:
+    secrets: |
+      - resourceName: "projects/gke-new-2026/secrets/postgres-password/versions/latest"
+        fileName: "dbpassword"
+
+###create Progredb:
+ubuntu@DESKTOP-C8GNSJ7:~/kcad/googleproject/KubernetesProjects/sharedIngress$ cat postgres.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: database
+spec:
+  serviceName: postgres
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: postgres
+
+  template:
+    metadata:
+      labels:
+        app: postgres
+
+    spec:
+      serviceAccountName: postgres-sa
+
+      containers:
+      - name: postgres
+        image: postgres:16
+        ports:
+        - containerPort: 5432
+
+        env:
+        - name: POSTGRES_PASSWORD_FILE
+          value: /mnt/secrets/dbpassword
+
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+
+        - name: secrets-store
+          mountPath: "/mnt/secrets"
+          readOnly: true
+
+      volumes:
+      - name: secrets-store
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: "postgres-secret"
+
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi		
+
+###PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: database
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+  - port: 5432	
+
+### Deploy Nginx
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+
+  template:
+    metadata:
+      labels:
+        app: nginx
+
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80 
+
+### Nginx Service	
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: web
+spec:
+  selector:
+    app: nginx
+  ports:
+  - port: 80
+  
+### NEG(Network Endpoint Group)
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: web
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+spec:
+  selector:
+    app: nginx
+  ports:
+  - port: 80
+    targetPort: 80
+  
+### Create Managed Certificate
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: deeptech-cert
+  namespace: web
+spec:
+  domains:
+    - deeptechexpertconsulting.com  
+
+### Ingress with TLS
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: deeptech-ingress
+  namespace: web
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: deeptech-cert
+
+spec:
+  rules:
+  - host: deeptechexpertconsulting.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-service
+            port:
+              number: 80	
+### Point DNS
+kubectl get ingress -n web	
+deeptechexpertconsulting.com → LoadBalancer IP	
+
+### est Database Secret (Proof CSI works)
+kubectl exec -it postgres-0 -n database -- bash	  
+--> Check mounted secret
+cat /mnt/secrets/dbpassword
+
+### Test --> https://deeptechexpertconsulting.com
+
+Note:
+When you create an Ingress in Google Kubernetes Engine, Kubernetes automatically creates a Google Cloud HTTP(S) Load Balancer.
+The external LB needs a way to reach your pods. But with ClusterIP, the lb cannot directly reach the pods.
+
+Option 1: Internet --> Google Load Balancer --> NodePort --> NodePort  ---> Worker Node  --> Pods
+Option 2: Interent --> Google Load Balancer --> NEG(Network Endpoint Group) --> Pods directly. LB connects directly yo pods.
